@@ -16,4 +16,7 @@ COPY . .
 
 RUN mkdir -p /data /data/photos
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--h11-max-incomplete-event-size", "65536"]

@@ -26,9 +26,11 @@ services:
     volumes:
       - ./heatmap-counter:/workspace
     privileged: true
+    environment:
+      DEMO_EXPIRES_DATE: ${DEMO_EXPIRES_DATE:-}
     networks:
       - heatmap-net
-    restart: unless-stopped
+    restart: on-failure
     deploy:
       resources:
         reservations:
@@ -51,9 +53,11 @@ services:
       - ./phone-detection:/workspace
     group_add:
       - video
+    environment:
+      DEMO_EXPIRES_DATE: ${DEMO_EXPIRES_DATE:-}
     networks:
       - phone-net
-    restart: unless-stopped
+    restart: on-failure
     deploy:
       resources:
         reservations:
@@ -148,7 +152,7 @@ services:
 
   attendance-backend:
     build: ./smart-attendance/backend
-    restart: unless-stopped
+    restart: on-failure
     env_file: .env
     ports:
       - "${BACKEND_PORT:-8080}:8080"
