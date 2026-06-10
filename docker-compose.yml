@@ -1,0 +1,191 @@
+# Vision Analytics Platform — Combined Docker Compose
+#
+# Services & Ports:
+#   http://localhost:8001  →  heatmap-counter   (Flask/YOLO person tracking + heatmap)
+#   http://localhost:8002  →  phone-detection   (Flask/YOLO phone usage zones)
+#   http://localhost:8000  →  CompreFace UI     (smart-attendance setup)
+#   http://localhost:8080  →  attendance-backend (FastAPI)
+#   http://localhost:3000  →  attendance-frontend (React dashboard)
+#
+# Usage:
+#   docker compose up -d --build
+#
+# Note: CompreFace (compreface-core) takes ~2 minutes to become healthy on first start.
+
+services:
+
+  # ── SYSTEM 1: Heatmap Counter ──────────────────────────────────────────────
+  # Real-time person detection, multi-object tracking, and heatmap generation.
+  # Configure via the web UI at http://localhost:8001
+  heatmap-counter:
+    build: ./heatmap-counter
+    working_dir: /workspace
+    command: python app.py
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./heatmap-counter:/workspace
+    privileged: true
+    networks:
+      - heatmap-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── SYSTEM 2: Phone Detection ──────────────────────────────────────────────
+  # YOLO-based phone and person detection with configurable zones.
+  # Configure via the web UI at http://localhost:8002
+  # Camera source is set in phone-detection/state.json
+  phone-detection:
+    build: ./phone-detection
+    working_dir: /workspace
+    command: python app.py
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./phone-detection:/workspace
+    group_add:
+      - video
+    networks:
+      - phone-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── SYSTEM 3: Smart Attendance — CompreFace Stack ──────────────────────────
+  # Face recognition attendance system.
+  # Setup: http://localhost:8000 (CompreFace UI) → create account → create
+  # Recognition service → copy API key → paste into http://localhost:3000
+
+  compreface-postgres-db:
+    image: exadel/compreface-postgres-db:1.2.0
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: frs
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - compreface-net
+
+  compreface-core:
+    image: exadel/compreface-core:1.2.0
+    restart: unless-stopped
+    networks:
+      - compreface-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/healthcheck || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
+
+  compreface-api:
+    image: exadel/compreface-api:1.2.0
+    restart: unless-stopped
+    depends_on:
+      compreface-postgres-db:
+        condition: service_started
+      compreface-core:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_URL: jdbc:postgresql://compreface-postgres-db:5432/frs
+      SPRING_PROFILES_ACTIVE: dev
+      SAVE_IMAGES_TO_DB: "true"
+      MAX_FILE_SIZE: 5MB
+      MAX_REQUEST_SIZE: 5MB
+      CONNECTION_TIMEOUT: 10000
+      READ_TIMEOUT: 60000
+      CORE_URL: http://compreface-core:3000
+    networks:
+      - compreface-net
+
+  compreface-admin:
+    image: exadel/compreface-admin:1.2.0
+    restart: unless-stopped
+    depends_on:
+      compreface-postgres-db:
+        condition: service_started
+      compreface-api:
+        condition: service_started
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_URL: jdbc:postgresql://compreface-postgres-db:5432/frs
+      SPRING_PROFILES_ACTIVE: dev
+      ENABLE_EMAIL_SERVER: "false"
+      ADMIN_JAVA_OPTS: "-Xmx512m"
+    networks:
+      - compreface-net
+
+  compreface-fe:
+    image: exadel/compreface-fe:1.2.0
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    depends_on:
+      - compreface-api
+      - compreface-admin
+    environment:
+      CLIENT_MAX_BODY_SIZE: 10M
+      PROXY_READ_TIMEOUT: 60000ms
+      PROXY_CONNECT_TIMEOUT: 10000ms
+    networks:
+      - compreface-net
+
+  attendance-backend:
+    build: ./smart-attendance/backend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - /dev:/dev
+      - attendance-data:/data
+    device_cgroup_rules:
+      - 'c 81:* rmw'
+    group_add:
+      - video
+    depends_on:
+      compreface-core:
+        condition: service_healthy
+    networks:
+      - compreface-net
+      - attendance-net
+
+  attendance-frontend:
+    build: ./smart-attendance/frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - attendance-backend
+    networks:
+      - attendance-net
+
+volumes:
+  postgres-data:
+  attendance-data:
+
+networks:
+  heatmap-net:
+    driver: bridge
+  phone-net:
+    driver: bridge
+  compreface-net:
+    driver: bridge
+  attendance-net:
+    driver: bridge

@@ -1,3 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Model weights and inference output
+*.pt
+*.onnx
+*.torchscript
+runs/
+
 # Logs
 logs
 *.log
@@ -141,30 +152,3 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
-
-# YOLO model weights (large binary files — download separately)
-*.pt
-
-# App state files (contain local camera config and may have credentials)
-heatmap-counter/state.json
-phone-detection/state.json
-
-# Runtime outputs
-heatmap-counter/outputs/snapshots/
-heatmap-counter/outputs/counts_log.csv
-
-# Per-project docker-compose files (superseded by root docker-compose.yml)
-heatmap-counter/docker-compose.yml
-phone-detection/docker-compose.yml
-
-# SSH/API keys accidentally copied from source projects
-heatmap-counter/key
-phone-detection/key
-
-# Python caches
-**/__pycache__/
-**/*.py[cod]
-
-# Frontend build artifacts (in subdirectories)
-smart-attendance/frontend/node_modules/
-smart-attendance/frontend/dist/

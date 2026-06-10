@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Monitor</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Shop Monitor</h1>
+    <div id="status-badge" class="badge">Live</div>
+    <div id="fps-badge" class="badge badge-fps">-- fps</div>
+  </header>
+
+  <main>
+    <!-- ── Two video panels ─────────────────────────────────── -->
+    <div id="streams-area">
+      <div class="stream-panel">
+        <div class="stream-label">Person Detection</div>
+        <img id="det-img" src="/stream/detection" alt="Detection stream">
+      </div>
+      <div class="stream-panel">
+        <div class="stream-label">Heatmap</div>
+        <img id="heat-img" src="/stream/heatmap" alt="Heatmap stream">
+      </div>
+    </div>
+
+    <!-- ── Sidebar ───────────────────────────────────────────── -->
+    <aside id="sidebar">
+
+      <!-- Stats -->
+      <section class="panel">
+        <h2>Live Stats</h2>
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="stat-value" id="stat-occupancy">—</div>
+            <div class="stat-label">In Shop Now</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="stat-visitors">—</div>
+            <div class="stat-label">Total Visitors</div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-key">Session</span>
+          <span class="stat-val mono" id="stat-session">00:00:00</span>
+        </div>
+      </section>
+
+      <!-- Camera -->
+      <section class="panel">
+        <h2>Camera</h2>
+        <label for="camera-select">Source</label>
+        <select id="camera-select"><option>Loading…</option></select>
+        <label for="resolution-select">Resolution</label>
+        <select id="resolution-select">
+          <option value="640x480">640 × 480</option>
+          <option value="1280x720" selected>1280 × 720 (HD)</option>
+          <option value="1920x1080">1920 × 1080 (FHD)</option>
+          <option value="2560x1440">2560 × 1440 (QHD)</option>
+        </select>
+        <button id="apply-camera-btn" class="btn-primary" style="margin-top:10px">Apply Camera</button>
+      </section>
+
+      <!-- IP / Network Camera -->
+      <section class="panel">
+        <h2>IP / Network Camera</h2>
+        <label for="camera-url-input">RTSP or HTTP URL</label>
+        <input type="text" id="camera-url-input"
+               placeholder="rtsp://user:pass@ip:port/path">
+        <button id="connect-url-btn" class="btn-primary" style="margin-top:10px">Connect</button>
+      </section>
+
+      <!-- Model -->
+      <section class="panel">
+        <h2>Model</h2>
+        <label for="model-select">YOLO Model</label>
+        <select id="model-select">
+          <option value="yolo26n.pt">yolo26n — Nano (fastest)</option>
+          <option value="yolo26s.pt">yolo26s — Small</option>
+          <option value="yolo26m.pt">yolo26m — Medium</option>
+          <option value="yolo26l.pt">yolo26l — Large</option>
+          <option value="yolo26x.pt">yolo26x — XLarge (most accurate)</option>
+        </select>
+        <label for="device-select">Device</label>
+        <select id="device-select">
+          <option value="">Auto (GPU if available)</option>
+          <option value="cpu">CPU</option>
+          <option value="0">CUDA:0</option>
+        </select>
+      </section>
+
+      <!-- Inference -->
+      <section class="panel">
+        <h2>Detection</h2>
+
+        <label for="conf-range">
+          Confidence <span class="param-val" id="conf-val">0.35</span>
+        </label>
+        <input type="range" id="conf-range" min="0.05" max="0.95" step="0.05" value="0.35">
+
+        <label for="iou-range">
+          IoU Threshold <span class="param-val" id="iou-val">0.50</span>
+        </label>
+        <input type="range" id="iou-range" min="0.1" max="0.9" step="0.05" value="0.5">
+
+        <label for="tracker-select">Tracker</label>
+        <select id="tracker-select">
+          <option value="bytetrack.yaml">ByteTrack (fast)</option>
+          <option value="botsort.yaml">BoT-SORT (robust)</option>
+        </select>
+
+        <label for="track-buffer-range">
+          Track Buffer (frames) <span class="param-val" id="track-buffer-val">60</span>
+        </label>
+        <input type="range" id="track-buffer-range" min="10" max="300" step="10" value="60">
+
+        <label for="min-track-frames-range">
+          Min Frames to Count <span class="param-val" id="min-track-frames-val">10</span>
+        </label>
+        <input type="range" id="min-track-frames-range" min="1" max="60" step="1" value="10">
+
+        <label for="vid-stride-input">
+          Frame Stride <span class="param-val" id="vid-stride-val">1</span>
+        </label>
+        <input type="range" id="vid-stride-range" min="1" max="10" step="1" value="1">
+      </section>
+
+      <!-- Heatmap -->
+      <section class="panel">
+        <h2>Heatmap</h2>
+        <label for="colormap-select">Colormap</label>
+        <select id="colormap-select">
+          <option value="2">Jet</option>
+          <option value="11">Hot</option>
+          <option value="14">Inferno</option>
+          <option value="15">Plasma</option>
+          <option value="16">Viridis</option>
+          <option value="0">Autumn</option>
+        </select>
+
+        <label for="alpha-range">
+          Blend Alpha <span class="param-val" id="alpha-val">0.50</span>
+        </label>
+        <input type="range" id="alpha-range" min="0.1" max="0.9" step="0.05" value="0.5">
+      </section>
+
+      <!-- Actions -->
+      <section class="panel">
+        <h2>Actions</h2>
+        <button id="reset-heatmap-btn" class="btn-secondary">Reset Heatmap</button>
+        <button id="reset-counts-btn" class="btn-secondary">Reset Counts</button>
+      </section>
+
+    </aside>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    const INITIAL_STATE = {{ initial_state | tojson | safe }};
+  </script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
