@@ -6,6 +6,7 @@ A unified platform combining three independent computer-vision systems under a s
 |--------|-----|-------------|
 | Heatmap Counter | http://localhost:8001 | Real-time person detection, tracking, and foot-traffic heatmap |
 | Phone Detection | http://localhost:8002 | YOLO-based phone usage detection with configurable zones |
+| Person Detection | http://localhost:8003 | YOLO-based person presence detection with configurable zones |
 | Smart Attendance | http://localhost:3000 | Face-recognition attendance tracking (entry/exit) |
 | Attendance API | http://localhost:8080 | FastAPI backend (Swagger docs at `/docs`) |
 | CompreFace UI | http://localhost:8000 | Face recognition engine admin panel |
@@ -227,12 +228,13 @@ Go to **Employees → Add Employee**, then click **Enroll Face** to upload or ca
 
 ## Step 8 — Configure Cameras
 
-### Heatmap Counter and Phone Detection
+### Heatmap Counter, Phone Detection, and Person Detection
 
-Both apps have a full settings panel in the browser — no file editing needed.
+All three apps have a full settings panel in the browser — no file editing needed.
 
 - **Heatmap Counter** (`http://localhost:8001`): Select camera source, resolution, and model from the UI.
 - **Phone Detection** (`http://localhost:8002`): Select camera source and draw detection zones directly in the browser.
+- **Person Detection** (`http://localhost:8003`): Select camera source and draw detection zones directly in the browser. Tracks how long a person is present in each zone.
 
 Settings are saved automatically and persist across restarts.
 
@@ -312,12 +314,13 @@ You should see two lines — one for midnight, one for system boot:
 docker compose ps
 ```
 
-All 9 services should be running:
+All 10 services should be running:
 
 ```
 NAME                       STATUS
 heatmap-counter            Up
 phone-detection            Up
+person-detection           Up
 compreface-postgres-db     Up
 compreface-core            Up (healthy)
 compreface-api             Up
@@ -333,6 +336,7 @@ Open each URL in the browser on the Windows machine:
 |---------|-----|
 | Heatmap Counter | http://localhost:8001 |
 | Phone Detection | http://localhost:8002 |
+| Person Detection | http://localhost:8003 |
 | Attendance Dashboard | http://localhost:3000 |
 | Attendance API docs | http://localhost:8080/docs |
 | CompreFace UI | http://localhost:8000 |
@@ -350,6 +354,7 @@ docker compose logs -f heatmap-counter
 
 # Restart a single service
 docker compose restart phone-detection
+docker compose restart person-detection
 
 # Stop everything (services stay stopped until manually started)
 docker compose stop
