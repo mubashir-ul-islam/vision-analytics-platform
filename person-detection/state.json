@@ -1,0 +1,9 @@
+{
+  "camera_source": 0,
+  "width": 1280,
+  "height": 720,
+  "model_name": "yolo26n.pt",
+  "person_conf": 0.5,
+  "main_region": null,
+  "zones": []
+}
