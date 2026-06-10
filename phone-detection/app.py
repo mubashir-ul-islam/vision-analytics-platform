@@ -15,6 +15,8 @@ _trackers = {}          # zone_id (int) -> ZoneTracker
 _trackers_lock = threading.Lock()
 _latest_frame = None
 _frame_lock = threading.Lock()
+_fps = 0.0
+_fps_lock = threading.Lock()
 
 
 def _sync_trackers():
@@ -29,7 +31,8 @@ def _sync_trackers():
 
 
 def _inference_loop():
-    global _latest_frame
+    global _latest_frame, _fps
+    prev_time = time.time()
     while True:
         frame = camera.get_frame()
         if frame is None:
@@ -37,7 +40,12 @@ def _inference_loop():
             continue
         state = app_state.get()
         annotated, zone_hits = detect(frame, state['main_region'], state['zones'],
-                                      state['phone_conf'], state['person_conf'])
+                                      state['phone_conf'], state['person_conf'],
+                                      state['person_phone_overlap'])
+        now = time.time()
+        with _fps_lock:
+            _fps = round(1.0 / max(now - prev_time, 1e-6), 1)
+        prev_time = now
         with _trackers_lock:
             for zid, hit in zone_hits.items():
                 if zid in _trackers:
@@ -69,8 +77,9 @@ def index():
         'width':         s['width'],
         'height':        s['height'],
         'model_name':    s['model_name'],
-        'phone_conf':    s['phone_conf'],
-        'person_conf':   s['person_conf'],
+        'phone_conf':           s['phone_conf'],
+        'person_conf':          s['person_conf'],
+        'person_phone_overlap': s['person_phone_overlap'],
     }
     return render_template('index.html', initial_state=initial)
 
@@ -144,23 +153,29 @@ def api_clear_regions():
 @app.route('/api/stats')
 def api_stats():
     zones = app_state.get()['zones']
-    result = []
+    zone_stats = []
     with _trackers_lock:
         for zone in zones:
             zid = zone['id']
             stats = (_trackers[zid].get_stats() if zid in _trackers
                      else {'total_seconds': 0, 'is_active': False, 'sessions': 0})
-            result.append({'id': zid, 'name': zone['name'], **stats})
-    return jsonify(result)
+            zone_stats.append({'id': zid, 'name': zone['name'], **stats})
+    with _fps_lock:
+        current_fps = _fps
+    return jsonify({'fps': current_fps, 'zones': zone_stats})
 
 
 @app.route('/api/confidence', methods=['POST'])
 def api_confidence():
-    data        = request.get_json(force=True, silent=True) or {}
-    phone_conf  = float(data.get('phone_conf',  0.5))
-    person_conf = float(data.get('person_conf', 0.5))
-    app_state.set_confidence(phone_conf, person_conf)
-    return jsonify({'ok': True, 'phone_conf': phone_conf, 'person_conf': person_conf})
+    data                 = request.get_json(force=True, silent=True) or {}
+    phone_conf           = float(data.get('phone_conf',  0.5))
+    person_conf          = float(data.get('person_conf', 0.5))
+    person_phone_overlap = data.get('person_phone_overlap')
+    if person_phone_overlap is not None:
+        person_phone_overlap = float(person_phone_overlap)
+    app_state.set_confidence(phone_conf, person_conf, person_phone_overlap)
+    return jsonify({'ok': True, 'phone_conf': phone_conf, 'person_conf': person_conf,
+                    'person_phone_overlap': app_state.get()['person_phone_overlap']})
 
 
 @app.route('/api/stats/reset', methods=['POST'])

@@ -16,6 +16,7 @@ const canvas         = document.getElementById('draw-canvas');
 const ctx            = canvas.getContext('2d');
 const modeHint       = document.getElementById('mode-hint');
 const statsList      = document.getElementById('stats-list');
+const fpsBadge       = document.getElementById('fps-badge');
 
 // ── Canvas size sync ─────────────────────────────────────────────────────────
 function syncCanvas() {
@@ -282,38 +283,45 @@ applyCameraBtn.addEventListener('click', async () => {
 });
 
 // ── Confidence sliders ────────────────────────────────────────────────────────
-const phoneSlider  = document.getElementById('phone-conf');
-const personSlider = document.getElementById('person-conf');
-const phoneVal     = document.getElementById('phone-conf-val');
-const personVal    = document.getElementById('person-conf-val');
+const phoneSlider   = document.getElementById('phone-conf');
+const personSlider  = document.getElementById('person-conf');
+const overlapSlider = document.getElementById('person-phone-overlap');
+const phoneVal      = document.getElementById('phone-conf-val');
+const personVal     = document.getElementById('person-conf-val');
+const overlapVal    = document.getElementById('overlap-val');
 
 let _confTimer = null;
 
 function initSliders() {
-  phoneSlider.value  = Math.round(INITIAL_STATE.phone_conf  * 100);
-  personSlider.value = Math.round(INITIAL_STATE.person_conf * 100);
-  phoneVal.textContent  = `${phoneSlider.value}%`;
-  personVal.textContent = `${personSlider.value}%`;
+  phoneSlider.value   = Math.round(INITIAL_STATE.phone_conf  * 100);
+  personSlider.value  = Math.round(INITIAL_STATE.person_conf * 100);
+  overlapSlider.value = Math.round(INITIAL_STATE.person_phone_overlap * 100);
+  phoneVal.textContent   = `${phoneSlider.value}%`;
+  personVal.textContent  = `${personSlider.value}%`;
+  overlapVal.textContent = `${overlapSlider.value}%`;
 }
 
 function onSliderChange() {
-  phoneVal.textContent  = `${phoneSlider.value}%`;
-  personVal.textContent = `${personSlider.value}%`;
+  phoneVal.textContent   = `${phoneSlider.value}%`;
+  personVal.textContent  = `${personSlider.value}%`;
+  overlapVal.textContent = `${overlapSlider.value}%`;
   clearTimeout(_confTimer);
   _confTimer = setTimeout(async () => {
     await fetch('/api/confidence', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        phone_conf:  parseFloat(phoneSlider.value)  / 100,
-        person_conf: parseFloat(personSlider.value) / 100,
+        phone_conf:           parseFloat(phoneSlider.value)   / 100,
+        person_conf:          parseFloat(personSlider.value)  / 100,
+        person_phone_overlap: parseFloat(overlapSlider.value) / 100,
       }),
     });
   }, 300);  // debounce — send only after slider stops moving
 }
 
-phoneSlider.addEventListener('input',  onSliderChange);
-personSlider.addEventListener('input', onSliderChange);
+phoneSlider.addEventListener('input',   onSliderChange);
+personSlider.addEventListener('input',  onSliderChange);
+overlapSlider.addEventListener('input', onSliderChange);
 initSliders();
 
 // ── Model switching ───────────────────────────────────────────────────────────
@@ -374,6 +382,7 @@ function updateStats(stats) {
           <span class="indicator" id="ind-${zone.id}"></span>
           <span class="zone-name">${zone.name}</span>
         </div>
+        <div class="zone-status" id="status-${zone.id}"></div>
         <div class="zone-time" id="time-${zone.id}">00:00:00</div>
         <div class="zone-sessions" id="sess-${zone.id}">0 sessions</div>
       `;
@@ -384,6 +393,12 @@ function updateStats(stats) {
       'indicator' + (zone.is_active ? ' active' : '');
     item.className =
       'stat-item' + (zone.is_active ? ' active' : '');
+    const statusEl = document.getElementById(`status-${zone.id}`);
+    if (statusEl) {
+      statusEl.textContent  = zone.is_active ? '📱 Phone in use' : '';
+      statusEl.style.color  = zone.is_active ? '#f5a623' : '';
+      statusEl.style.fontWeight = zone.is_active ? 'bold' : '';
+    }
     document.getElementById(`time-${zone.id}`).textContent =
       formatTime(zone.total_seconds);
     document.getElementById(`sess-${zone.id}`).textContent =
@@ -428,9 +443,10 @@ async function loadRegions() {
 // ── Polling ───────────────────────────────────────────────────────────────────
 setInterval(async () => {
   try {
-    const resp  = await fetch('/api/stats');
-    const stats = await resp.json();
-    updateStats(stats);
+    const resp = await fetch('/api/stats');
+    const data = await resp.json();
+    fpsBadge.textContent = `${data.fps ?? '--'} fps`;
+    updateStats(data.zones ?? []);
   } catch (_) { /* ignore if server busy */ }
 }, 1000);
 

@@ -10,6 +10,7 @@
   <header>
     <h1>Phone Detection Monitor</h1>
     <div id="status-badge" class="badge">Live</div>
+    <div id="fps-badge" class="badge badge-fps">-- fps</div>
   </header>
 
   <main>
@@ -74,6 +75,13 @@
         <input id="phone-conf" type="range" min="1" max="99" step="1">
         <label style="margin-top:10px">Person <span id="person-conf-val"></span></label>
         <input id="person-conf" type="range" min="1" max="99" step="1">
+        <label style="margin-top:10px">
+          Person–Phone Overlap <span id="overlap-val"></span>
+          <span class="hint-text" style="display:block;margin-top:2px">
+            How much of the phone box must be inside a person box to count as "in use"
+          </span>
+        </label>
+        <input id="person-phone-overlap" type="range" min="5" max="95" step="5">
       </section>
 
       <section class="panel">
