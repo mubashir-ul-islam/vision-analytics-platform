@@ -11,17 +11,16 @@ from state import MODELS, app_state
 app = Flask(__name__)
 
 # ── Runtime state (not persisted) ────────────────────────────────────────────
-_lock           = threading.Lock()
-_latest_frame   = None
-_fps            = 0.0
-_in_count       = 0
-_out_count      = 0
-_prev_centroids = []    # [(px, py), ...] from the last processed frame
-_cooldowns      = []    # [((cx,cy), timestamp), ...] recent crossings
+_lock        = threading.Lock()
+_latest_frame = None
+_fps         = 0.0
+_in_count    = 0
+_out_count   = 0
+_track_sides = {}   # {track_id: last_side} — managed by ByteTrack IDs
 
 
 def _inference_loop():
-    global _latest_frame, _fps, _in_count, _out_count, _prev_centroids, _cooldowns
+    global _latest_frame, _fps, _in_count, _out_count, _track_sides
     prev_time = time.time()
     while True:
         frame = camera.get_frame()
@@ -30,17 +29,16 @@ def _inference_loop():
             continue
 
         with _lock:
-            s            = app_state.get()
-            prev_c       = list(_prev_centroids)
-            cooldowns_in = list(_cooldowns)
+            s          = app_state.get()
+            sides_snap = dict(_track_sides)
 
-        annotated, new_c, in_d, out_d, new_cool = detect(
+        annotated, new_sides, in_d, out_d = detect(
             frame,
             s['line'],
-            prev_c,
+            sides_snap,
             s['flip_direction'],
-            cooldowns_in,
             s['person_conf'],
+            s['tracker'],
         )
 
         now = time.time()
@@ -48,12 +46,11 @@ def _inference_loop():
         prev_time = now
 
         with _lock:
-            _latest_frame   = annotated
-            _fps            = fps
-            _prev_centroids = new_c
-            _cooldowns      = new_cool
-            _in_count       += in_d
-            _out_count      += out_d
+            _latest_frame = annotated
+            _fps          = fps
+            _track_sides  = new_sides
+            _in_count    += in_d
+            _out_count   += out_d
 
 
 def _generate_stream():
@@ -138,12 +135,9 @@ def api_get_line():
 def api_set_line():
     data = request.get_json(force=True, silent=True) or {}
     line = data.get('line')
-    # Validate: must be [[x1,y1],[x2,y2]] with values in [0,1]
     if (line and isinstance(line, list) and len(line) == 2
             and all(isinstance(p, list) and len(p) == 2 for p in line)):
         app_state.set_line(line)
-        with _lock:
-            pass  # prev_centroids will naturally reset on next frame
         return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': 'Invalid line format'}), 400
 
@@ -181,12 +175,11 @@ def api_stats():
 
 @app.route('/api/stats/reset', methods=['POST'])
 def api_reset_stats():
-    global _in_count, _out_count, _prev_centroids, _cooldowns
+    global _in_count, _out_count, _track_sides
     with _lock:
-        _in_count       = 0
-        _out_count      = 0
-        _prev_centroids = []
-        _cooldowns      = []
+        _in_count    = 0
+        _out_count   = 0
+        _track_sides = {}
     return jsonify({'ok': True})
 
 

@@ -16,6 +16,7 @@ class AppState:
         self.model_name = 'yolo26n.pt'
         self.person_conf = 0.35
         self.flip_direction = False
+        self.tracker = 'bytetrack.yaml'  # or 'botsort.yaml' for heavy-occlusion scenes
         self.line = None    # [[x1,y1],[x2,y2]] normalized 0–1, or None
         self._load()
 
@@ -28,6 +29,7 @@ class AppState:
                 'model_name':     self.model_name,
                 'person_conf':    self.person_conf,
                 'flip_direction': self.flip_direction,
+                'tracker':        self.tracker,
                 'line':           self.line,
             }
 
@@ -72,6 +74,7 @@ class AppState:
             'model_name':     self.model_name,
             'person_conf':    self.person_conf,
             'flip_direction': self.flip_direction,
+            'tracker':        self.tracker,
             'line':           self.line,
         }
         try:
@@ -93,6 +96,7 @@ class AppState:
             self.model_name     = data.get('model_name', 'yolo26n.pt')
             self.person_conf    = data.get('person_conf', 0.35)
             self.flip_direction = bool(data.get('flip_direction', False))
+            self.tracker        = data.get('tracker', 'bytetrack.yaml')
             self.line           = data.get('line')
         except Exception:
             pass
