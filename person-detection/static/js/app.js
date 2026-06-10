@@ -282,32 +282,46 @@ applyCameraBtn.addEventListener('click', async () => {
   }
 });
 
-// ── Confidence slider ─────────────────────────────────────────────────────────
-const personSlider = document.getElementById('person-conf');
-const personVal    = document.getElementById('person-conf-val');
+// ── Confidence sliders ────────────────────────────────────────────────────────
+const phoneSlider   = document.getElementById('phone-conf');
+const personSlider  = document.getElementById('person-conf');
+const overlapSlider = document.getElementById('person-phone-overlap');
+const phoneVal      = document.getElementById('phone-conf-val');
+const personVal     = document.getElementById('person-conf-val');
+const overlapVal    = document.getElementById('overlap-val');
 
 let _confTimer = null;
 
 function initSliders() {
-  personSlider.value = Math.round(INITIAL_STATE.person_conf * 100);
-  personVal.textContent = `${personSlider.value}%`;
+  phoneSlider.value   = Math.round(INITIAL_STATE.phone_conf  * 100);
+  personSlider.value  = Math.round(INITIAL_STATE.person_conf * 100);
+  overlapSlider.value = Math.round(INITIAL_STATE.person_phone_overlap * 100);
+  phoneVal.textContent   = `${phoneSlider.value}%`;
+  personVal.textContent  = `${personSlider.value}%`;
+  overlapVal.textContent = `${overlapSlider.value}%`;
 }
 
 function onSliderChange() {
-  personVal.textContent = `${personSlider.value}%`;
+  phoneVal.textContent   = `${phoneSlider.value}%`;
+  personVal.textContent  = `${personSlider.value}%`;
+  overlapVal.textContent = `${overlapSlider.value}%`;
   clearTimeout(_confTimer);
   _confTimer = setTimeout(async () => {
     await fetch('/api/confidence', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        person_conf: parseFloat(personSlider.value) / 100,
+        phone_conf:           parseFloat(phoneSlider.value)   / 100,
+        person_conf:          parseFloat(personSlider.value)  / 100,
+        person_phone_overlap: parseFloat(overlapSlider.value) / 100,
       }),
     });
   }, 300);  // debounce — send only after slider stops moving
 }
 
-personSlider.addEventListener('input', onSliderChange);
+phoneSlider.addEventListener('input',   onSliderChange);
+personSlider.addEventListener('input',  onSliderChange);
+overlapSlider.addEventListener('input', onSliderChange);
 initSliders();
 
 // ── Model switching ───────────────────────────────────────────────────────────
@@ -342,7 +356,7 @@ function formatTime(sec) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
-  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+  return [h, m, s].map(v => String(v).padStart(2, '00')).join(':');
 }
 
 function updateStats(stats) {
@@ -365,30 +379,53 @@ function updateStats(stats) {
       item.className = 'stat-item';
       item.innerHTML = `
         <div class="zone-header">
-          <span class="indicator" id="ind-${zone.id}"></span>
           <span class="zone-name">${zone.name}</span>
         </div>
-        <div class="zone-status" id="status-${zone.id}"></div>
-        <div class="zone-time" id="time-${zone.id}">00:00:00</div>
-        <div class="zone-sessions" id="sess-${zone.id}">0 sessions</div>
+        <div class="stat-row">
+          <span class="indicator" id="person-ind-${zone.id}"></span>
+          <span class="stat-label">Person presence</span>
+        </div>
+        <div class="zone-status" id="person-status-${zone.id}"></div>
+        <div class="zone-time"    id="person-time-${zone.id}">00:00:00</div>
+        <div class="zone-sessions" id="person-sess-${zone.id}">0 sessions</div>
+        <div class="stat-row" style="margin-top:8px">
+          <span class="indicator" id="phone-ind-${zone.id}"></span>
+          <span class="stat-label">Phone usage</span>
+        </div>
+        <div class="zone-status" id="phone-status-${zone.id}"></div>
+        <div class="zone-time"   id="phone-time-${zone.id}">00:00:00</div>
+        <div class="zone-sessions" id="phone-sess-${zone.id}">0 sessions</div>
       `;
       statsList.appendChild(item);
     }
 
-    document.getElementById(`ind-${zone.id}`).className =
-      'indicator' + (zone.is_active ? ' active' : '');
-    item.className =
-      'stat-item' + (zone.is_active ? ' active' : '');
-    const statusEl = document.getElementById(`status-${zone.id}`);
-    if (statusEl) {
-      statusEl.textContent  = zone.is_active ? '🧍 Person present' : '';
-      statusEl.style.color  = zone.is_active ? '#2ecc71' : '';
-      statusEl.style.fontWeight = zone.is_active ? 'bold' : '';
-    }
-    document.getElementById(`time-${zone.id}`).textContent =
-      formatTime(zone.total_seconds);
-    document.getElementById(`sess-${zone.id}`).textContent =
-      `${zone.sessions} session${zone.sessions !== 1 ? 's' : ''}`;
+    // Person row
+    const personActive = zone.person_is_active;
+    document.getElementById(`person-ind-${zone.id}`).className =
+      'indicator' + (personActive ? ' active' : '');
+    const personStatus = document.getElementById(`person-status-${zone.id}`);
+    personStatus.textContent  = personActive ? '🧍 Person present' : '';
+    personStatus.style.color  = personActive ? '#2ecc71' : '';
+    personStatus.style.fontWeight = personActive ? 'bold' : '';
+    document.getElementById(`person-time-${zone.id}`).textContent =
+      formatTime(zone.person_total_seconds);
+    document.getElementById(`person-sess-${zone.id}`).textContent =
+      `${zone.person_sessions} session${zone.person_sessions !== 1 ? 's' : ''}`;
+
+    // Phone row
+    const phoneActive = zone.phone_is_active;
+    document.getElementById(`phone-ind-${zone.id}`).className =
+      'indicator' + (phoneActive ? ' active' : '');
+    const phoneStatus = document.getElementById(`phone-status-${zone.id}`);
+    phoneStatus.textContent  = phoneActive ? '📱 Phone in use' : '';
+    phoneStatus.style.color  = phoneActive ? '#f5a623' : '';
+    phoneStatus.style.fontWeight = phoneActive ? 'bold' : '';
+    document.getElementById(`phone-time-${zone.id}`).textContent =
+      formatTime(zone.phone_total_seconds);
+    document.getElementById(`phone-sess-${zone.id}`).textContent =
+      `${zone.phone_sessions} session${zone.phone_sessions !== 1 ? 's' : ''}`;
+
+    item.className = 'stat-item' + (personActive || phoneActive ? ' active' : '');
   });
 }
 

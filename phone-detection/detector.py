@@ -51,15 +51,16 @@ def _phone_person_overlap(phone_box, person_box):
 
 def detect(frame, main_region, zones, phone_conf=0.5, person_conf=0.5,
            person_phone_overlap=0.3):
-    """Detect phones and persons; count a phone as 'in use' only when it
-    overlaps with a person's bounding box by at least person_phone_overlap."""
+    """Detect phones and persons; return separate zone hits for person presence
+    and phone-in-use so both can be tracked independently."""
     h, w = frame.shape[:2]
     with _model_lock:
         results = model(frame, classes=[0, 67],
                         conf=min(phone_conf, person_conf), verbose=False)[0]
 
-    main_px   = _to_px(main_region, w, h) if main_region else None
-    zone_hits = {z['id']: False for z in zones}
+    main_px          = _to_px(main_region, w, h) if main_region else None
+    person_zone_hits = {z['id']: False for z in zones}
+    phone_zone_hits  = {z['id']: False for z in zones}
 
     # ── Pass 1: collect all valid detections ─────────────────────────────────
     person_boxes = []   # [(x1, y1, x2, y2, conf), ...]
@@ -105,14 +106,23 @@ def detect(frame, main_region, zones, phone_conf=0.5, person_conf=0.5,
         else:
             idle_phones.append(phone)
 
-    # ── Pass 3: zone hits — use the person's center, not the phone's ─────────
+    # ── Pass 3: zone hits ─────────────────────────────────────────────────────
+    # Person zone hits: any person (regardless of phone use) in a zone
+    for (rx1, ry1, rx2, ry2, _) in person_boxes:
+        pcx, pcy = (rx1 + rx2) // 2, (ry1 + ry2) // 2
+        for zone in zones:
+            zpx = _to_px(zone['rect'], w, h)
+            if _in_rect(pcx, pcy, zpx):
+                person_zone_hits[zone['id']] = True
+
+    # Phone zone hits: only persons actively using a phone in a zone
     for _, person in active_phones:
         rx1, ry1, rx2, ry2 = person[:4]
         pcx, pcy = (rx1 + rx2) // 2, (ry1 + ry2) // 2
         for zone in zones:
             zpx = _to_px(zone['rect'], w, h)
             if _in_rect(pcx, pcy, zpx):
-                zone_hits[zone['id']] = True
+                phone_zone_hits[zone['id']] = True
 
     # ── Draw persons ──────────────────────────────────────────────────────────
     for i, (rx1, ry1, rx2, ry2, rconf) in enumerate(person_boxes):
@@ -143,11 +153,11 @@ def detect(frame, main_region, zones, phone_conf=0.5, person_conf=0.5,
 
     for zone in zones:
         zpx    = _to_px(zone['rect'], w, h)
-        active = zone_hits[zone['id']]
+        active = person_zone_hits[zone['id']]
         color  = _ZONE_ACTIVE_CLR if active else _ZONE_CLR
         cv2.rectangle(frame, zpx[:2], zpx[2:], color, 2)
         cv2.putText(frame, zone['name'],
                     (zpx[0] + 4, zpx[1] + 22),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
 
-    return frame, zone_hits
+    return frame, person_zone_hits, phone_zone_hits

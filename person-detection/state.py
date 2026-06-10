@@ -14,7 +14,9 @@ class AppState:
         self.width = 1280
         self.height = 720
         self.model_name = 'yolo26n.pt'
-        self.person_conf = 0.5
+        self.phone_conf           = 0.5
+        self.person_conf          = 0.5
+        self.person_phone_overlap = 0.3  # min fraction of phone bbox inside a person bbox
         self.main_region = None     # [x1, y1, x2, y2] normalized 0–1, or None
         self.zones = []             # [{'id': int, 'name': str, 'rect': [x1,y1,x2,y2]}]
         self._load()
@@ -26,7 +28,9 @@ class AppState:
                 'width': self.width,
                 'height': self.height,
                 'model_name': self.model_name,
-                'person_conf': self.person_conf,
+                'phone_conf':           self.phone_conf,
+                'person_conf':          self.person_conf,
+                'person_phone_overlap': self.person_phone_overlap,
                 'main_region': self.main_region,
                 'zones': list(self.zones),
             }
@@ -38,9 +42,12 @@ class AppState:
             self.height = height
             self._save()
 
-    def set_confidence(self, person_conf):
+    def set_confidence(self, phone_conf, person_conf, person_phone_overlap=None):
         with self._lock:
+            self.phone_conf  = max(0.01, min(1.0, phone_conf))
             self.person_conf = max(0.01, min(1.0, person_conf))
+            if person_phone_overlap is not None:
+                self.person_phone_overlap = max(0.05, min(0.95, person_phone_overlap))
             self._save()
 
     def set_model(self, name):
@@ -66,7 +73,9 @@ class AppState:
             'width': self.width,
             'height': self.height,
             'model_name': self.model_name,
-            'person_conf': self.person_conf,
+            'phone_conf':           self.phone_conf,
+            'person_conf':          self.person_conf,
+            'person_phone_overlap': self.person_phone_overlap,
             'main_region': self.main_region,
             'zones': self.zones,
         }
@@ -87,10 +96,12 @@ class AppState:
                 self.camera_source = int(src) if isinstance(src, (int, float)) else src
             elif 'camera_index' in data:
                 self.camera_source = int(data['camera_index'])
-            self.width       = data.get('width', 1280)
-            self.height      = data.get('height', 720)
+            self.width      = data.get('width', 1280)
+            self.height     = data.get('height', 720)
             self.model_name  = data.get('model_name', 'yolo26n.pt')
-            self.person_conf = data.get('person_conf', 0.5)
+            self.phone_conf           = data.get('phone_conf',  0.5)
+            self.person_conf          = data.get('person_conf', 0.5)
+            self.person_phone_overlap = data.get('person_phone_overlap', 0.3)
             self.main_region = data.get('main_region')
             self.zones       = data.get('zones', [])
         except Exception:

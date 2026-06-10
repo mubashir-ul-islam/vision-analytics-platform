@@ -11,7 +11,8 @@ from tracker import ZoneTracker
 
 app = Flask(__name__)
 
-_trackers = {}          # zone_id (int) -> ZoneTracker
+_person_trackers = {}   # zone_id (int) -> ZoneTracker  (person presence)
+_phone_trackers  = {}   # zone_id (int) -> ZoneTracker  (phone in use)
 _trackers_lock = threading.Lock()
 _latest_frame = None
 _frame_lock = threading.Lock()
@@ -22,12 +23,17 @@ _fps_lock = threading.Lock()
 def _sync_trackers():
     with _trackers_lock:
         zone_ids = {z['id'] for z in app_state.zones}
-        for zid in list(_trackers.keys()):
+        for zid in list(_person_trackers.keys()):
             if zid not in zone_ids:
-                del _trackers[zid]
+                del _person_trackers[zid]
+        for zid in list(_phone_trackers.keys()):
+            if zid not in zone_ids:
+                del _phone_trackers[zid]
         for zid in zone_ids:
-            if zid not in _trackers:
-                _trackers[zid] = ZoneTracker()
+            if zid not in _person_trackers:
+                _person_trackers[zid] = ZoneTracker()
+            if zid not in _phone_trackers:
+                _phone_trackers[zid] = ZoneTracker()
 
 
 def _inference_loop():
@@ -39,17 +45,21 @@ def _inference_loop():
             time.sleep(0.01)
             continue
         state = app_state.get()
-        annotated, zone_hits = detect(frame, state['main_region'], state['zones'],
-                                      state['phone_conf'], state['person_conf'],
-                                      state['person_phone_overlap'])
+        annotated, person_zone_hits, phone_zone_hits = detect(
+            frame, state['main_region'], state['zones'],
+            state['phone_conf'], state['person_conf'],
+            state['person_phone_overlap'])
         now = time.time()
         with _fps_lock:
             _fps = round(1.0 / max(now - prev_time, 1e-6), 1)
         prev_time = now
         with _trackers_lock:
-            for zid, hit in zone_hits.items():
-                if zid in _trackers:
-                    _trackers[zid].update(hit)
+            for zid, hit in person_zone_hits.items():
+                if zid in _person_trackers:
+                    _person_trackers[zid].update(hit)
+            for zid, hit in phone_zone_hits.items():
+                if zid in _phone_trackers:
+                    _phone_trackers[zid].update(hit)
         with _frame_lock:
             _latest_frame = annotated
 
@@ -146,7 +156,8 @@ def api_set_regions():
 def api_clear_regions():
     app_state.clear_regions()
     with _trackers_lock:
-        _trackers.clear()
+        _person_trackers.clear()
+        _phone_trackers.clear()
     return jsonify({'ok': True})
 
 
@@ -157,9 +168,19 @@ def api_stats():
     with _trackers_lock:
         for zone in zones:
             zid = zone['id']
-            stats = (_trackers[zid].get_stats() if zid in _trackers
-                     else {'total_seconds': 0, 'is_active': False, 'sessions': 0})
-            zone_stats.append({'id': zid, 'name': zone['name'], **stats})
+            empty = {'total_seconds': 0, 'is_active': False, 'sessions': 0}
+            ps = _person_trackers[zid].get_stats() if zid in _person_trackers else empty
+            ph = _phone_trackers[zid].get_stats()  if zid in _phone_trackers  else empty
+            zone_stats.append({
+                'id':   zid,
+                'name': zone['name'],
+                'person_total_seconds': ps['total_seconds'],
+                'person_is_active':     ps['is_active'],
+                'person_sessions':      ps['sessions'],
+                'phone_total_seconds':  ph['total_seconds'],
+                'phone_is_active':      ph['is_active'],
+                'phone_sessions':       ph['sessions'],
+            })
     with _fps_lock:
         current_fps = _fps
     return jsonify({'fps': current_fps, 'zones': zone_stats})
@@ -181,7 +202,9 @@ def api_confidence():
 @app.route('/api/stats/reset', methods=['POST'])
 def api_reset_stats():
     with _trackers_lock:
-        for t in _trackers.values():
+        for t in _person_trackers.values():
+            t.reset()
+        for t in _phone_trackers.values():
             t.reset()
     return jsonify({'ok': True})
 
