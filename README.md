@@ -7,6 +7,7 @@ A unified platform combining three independent computer-vision systems under a s
 | Heatmap Counter | http://localhost:8001 | Real-time person detection, tracking, and foot-traffic heatmap |
 | Phone Detection | http://localhost:8002 | YOLO-based phone usage detection with configurable zones |
 | Person Detection | http://localhost:8003 | YOLO-based person presence detection with configurable zones |
+| Person Counter | http://localhost:8004 | Line-crossing entry/exit counter — tracks people entering and leaving |
 | Smart Attendance | http://localhost:3000 | Face-recognition attendance tracking (entry/exit) |
 | Attendance API | http://localhost:8080 | FastAPI backend (Swagger docs at `/docs`) |
 | CompreFace UI | http://localhost:8000 | Face recognition engine admin panel |
@@ -235,6 +236,7 @@ All three apps have a full settings panel in the browser — no file editing nee
 - **Heatmap Counter** (`http://localhost:8001`): Select camera source, resolution, and model from the UI.
 - **Phone Detection** (`http://localhost:8002`): Select camera source and draw detection zones directly in the browser.
 - **Person Detection** (`http://localhost:8003`): Select camera source and draw detection zones directly in the browser. Tracks how long a person is present in each zone.
+- **Person Counter** (`http://localhost:8004`): Draw a line across a doorway. Counts people crossing in each direction, showing total entered, exited, and currently inside.
 
 Settings are saved automatically and persist across restarts.
 
@@ -314,13 +316,14 @@ You should see two lines — one for midnight, one for system boot:
 docker compose ps
 ```
 
-All 10 services should be running:
+All 11 services should be running:
 
 ```
 NAME                       STATUS
 heatmap-counter            Up
 phone-detection            Up
 person-detection           Up
+person-counter             Up
 compreface-postgres-db     Up
 compreface-core            Up (healthy)
 compreface-api             Up
@@ -337,6 +340,7 @@ Open each URL in the browser on the Windows machine:
 | Heatmap Counter | http://localhost:8001 |
 | Phone Detection | http://localhost:8002 |
 | Person Detection | http://localhost:8003 |
+| Person Counter | http://localhost:8004 |
 | Attendance Dashboard | http://localhost:3000 |
 | Attendance API docs | http://localhost:8080/docs |
 | CompreFace UI | http://localhost:8000 |

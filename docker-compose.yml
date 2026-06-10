@@ -4,6 +4,7 @@
 #   http://localhost:8001  →  heatmap-counter   (Flask/YOLO person tracking + heatmap)
 #   http://localhost:8002  →  phone-detection   (Flask/YOLO phone usage zones)
 #   http://localhost:8003  →  person-detection  (Flask/YOLO person presence zones)
+#   http://localhost:8004  →  person-counter    (Flask/YOLO line-crossing entry/exit counter)
 #   http://localhost:8000  →  CompreFace UI     (smart-attendance setup)
 #   http://localhost:8080  →  attendance-backend (FastAPI)
 #   http://localhost:3000  →  attendance-frontend (React dashboard)
@@ -93,7 +94,33 @@ services:
               count: all
               capabilities: [gpu]
 
-  # ── SYSTEM 4: Smart Attendance — CompreFace Stack ──────────────────────────
+  # ── SYSTEM 4: Person Counter ──────────────────────────────────────────────
+  # YOLO-based line-crossing entry/exit counter for shops and doorways.
+  # Configure via the web UI at http://localhost:8004
+  person-counter:
+    build: ./person-counter
+    working_dir: /workspace
+    command: python app.py
+    ports:
+      - "8004:8000"
+    volumes:
+      - ./person-counter:/workspace
+    group_add:
+      - video
+    environment:
+      DEMO_EXPIRES_DATE: ${DEMO_EXPIRES_DATE:-}
+    networks:
+      - person-counter-net
+    restart: on-failure
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── SYSTEM 5: Smart Attendance — CompreFace Stack ──────────────────────────
   # Face recognition attendance system.
   # Setup: http://localhost:8000 (CompreFace UI) → create account → create
   # Recognition service → copy API key → paste into http://localhost:3000
@@ -217,6 +244,8 @@ networks:
   phone-net:
     driver: bridge
   person-net:
+    driver: bridge
+  person-counter-net:
     driver: bridge
   compreface-net:
     driver: bridge

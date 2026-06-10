@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Person Counter</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    /* ── Counter cards ───────────────────────────────── */
+    .counter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .counter-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      text-align: center;
+    }
+    .counter-card.full-width {
+      grid-column: 1 / -1;
+      border-left: 3px solid var(--success);
+    }
+    .counter-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .counter-value {
+      font-size: 2rem;
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .counter-card.in  .counter-value { color: #2ecc71; }
+    .counter-card.out .counter-value { color: #e74c3c; }
+    .counter-card.inside .counter-value { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Person Counter</h1>
+    <div id="status-badge" class="badge">Live</div>
+    <div id="fps-badge" class="badge badge-fps">-- fps</div>
+  </header>
+
+  <main>
+    <!-- Video + canvas overlay -->
+    <div id="video-wrapper">
+      <div id="video-container">
+        <img id="stream-img" src="/stream" alt="Camera feed">
+        <canvas id="draw-canvas"></canvas>
+      </div>
+      <div id="mode-hint"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+
+      <section class="panel">
+        <h2>Camera</h2>
+        <div class="toggle-row">
+          <button id="mode-webcam-btn" class="toggle-btn active">Webcam</button>
+          <button id="mode-url-btn"    class="toggle-btn">IP Camera</button>
+        </div>
+        <div id="webcam-controls">
+          <label for="camera-select">Device</label>
+          <select id="camera-select"><option>Loading…</option></select>
+          <label for="resolution-select">Resolution</label>
+          <select id="resolution-select">
+            <option value="640x480">640 × 480</option>
+            <option value="1280x720">1280 × 720 (HD)</option>
+            <option value="1920x1080">1920 × 1080 (FHD)</option>
+            <option value="2560x1440">2560 × 1440 (QHD)</option>
+          </select>
+        </div>
+        <div id="url-controls" style="display:none">
+          <label for="camera-url">Stream URL</label>
+          <input id="camera-url" type="text" placeholder="rtsp://user:pass@ip:port/path">
+          <p class="hint-text" style="margin-top:4px">Resolution is set by the camera</p>
+        </div>
+        <button id="apply-camera-btn" class="btn-primary" style="margin-top:10px">Apply</button>
+      </section>
+
+      <section class="panel">
+        <h2>Model</h2>
+        <label for="model-select">YOLO26 Variant</label>
+        <select id="model-select">
+          <option value="yolo26n.pt">YOLO26n — Nano (fastest)</option>
+          <option value="yolo26s.pt">YOLO26s — Small</option>
+          <option value="yolo26m.pt">YOLO26m — Medium</option>
+          <option value="yolo26l.pt">YOLO26l — Large</option>
+          <option value="yolo26x.pt">YOLO26x — XL (most accurate)</option>
+        </select>
+        <p class="hint-text" style="margin-top:4px">First switch downloads the model (~20–100 MB)</p>
+        <button id="apply-model-btn" class="btn-primary" style="margin-top:8px">Apply Model</button>
+      </section>
+
+      <section class="panel">
+        <h2>Confidence</h2>
+        <label>Person <span id="person-conf-val"></span></label>
+        <input id="person-conf" type="range" min="1" max="99" step="1">
+      </section>
+
+      <section class="panel">
+        <h2>Counting Line</h2>
+        <p class="hint-text">Draw a line across the doorway. The arrow shows the IN direction.</p>
+        <button id="draw-line-btn" class="btn-tool">Draw Line</button>
+        <div class="btn-row" style="margin-top:6px">
+          <button id="flip-btn"  class="btn-secondary">Flip IN/OUT</button>
+          <button id="clear-line-btn" class="btn-danger">Clear</button>
+        </div>
+        <button id="apply-line-btn" class="btn-primary" style="margin-top:6px">Apply Line</button>
+      </section>
+
+      <section class="panel">
+        <h2>Stats</h2>
+        <div class="counter-grid">
+          <div class="counter-card in">
+            <div class="counter-label">Entered</div>
+            <div class="counter-value" id="in-count">0</div>
+          </div>
+          <div class="counter-card out">
+            <div class="counter-label">Exited</div>
+            <div class="counter-value" id="out-count">0</div>
+          </div>
+          <div class="counter-card inside full-width">
+            <div class="counter-label">Currently Inside</div>
+            <div class="counter-value" id="inside-count">0</div>
+          </div>
+        </div>
+        <button id="reset-stats-btn" class="btn-secondary">Reset Counters</button>
+      </section>
+
+    </aside>
+  </main>
+
+  <div id="toast"></div>
+
+  <script>
+    const INITIAL_STATE = {{ initial_state | tojson | safe }};
+  </script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
